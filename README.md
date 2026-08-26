@@ -38,3 +38,31 @@ The CMS uses Supabase's browser upload API. This is suitable for normal-sized up
 ## Security
 
 The browser contains only the Supabase publishable key. The service-role key must never be placed in this project. Database and Storage RLS policies are the actual security boundary.
+
+## AI Chat Widget
+
+Every public page now shows a floating chat bubble (bottom-right). It greets
+first-time-this-session visitors automatically after a short delay, and lets
+them chat with an AI assistant powered by the Claude API.
+
+Setup:
+
+1. In your Vercel project, go to **Settings → Environment Variables** and add
+   `ANTHROPIC_API_KEY` with your Anthropic API key. Redeploy after adding it.
+2. That's it — `api/chat.js` is a serverless function that proxies chat
+   messages to Claude (model `claude-haiku-4-5-20251001` by default, chosen
+   for low cost; edit the model string in `api/chat.js` to upgrade).
+3. The API key is never exposed to the browser — only the serverless
+   function reads it.
+
+Conversation history is kept per-browser-session (sessionStorage), not saved
+to a database.
+
+## Visitor Log
+
+Run **`visits_schema.sql`** once in the Supabase SQL Editor. It creates a
+`visits` table that records one entry per visitor per browser session
+(page landed on, referrer, and user agent) — not one per page view.
+
+Check **Admin → Visitors** to see who has visited, with a running count of
+visits shown and visits today. There's a "Clear log" button for housekeeping.
