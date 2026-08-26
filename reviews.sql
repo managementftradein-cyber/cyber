@@ -20,6 +20,11 @@ create index if not exists reviews_target_idx on public.reviews (target_type, ta
 
 alter table public.reviews enable row level security;
 
+-- Remove legacy duplicate policies from earlier versions.
+drop policy if exists "Public can submit reviews" on public.reviews;
+drop policy if exists "Public can view approved reviews" on public.reviews;
+
+
 -- Anyone can submit a review, but it always lands unapproved.
 drop policy if exists "Cyberbishop public review submission" on public.reviews;
 create policy "Cyberbishop public review submission"
