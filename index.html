@@ -4,10 +4,10 @@
 <link rel="stylesheet" href="styles.css"><link rel="icon" type="image/png" href="assets/favicon.png"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="app.js"></script></head>
 <body><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="noise"></div><div class="cursor-glow"></div><div data-site-nav></div>
 <main>
-<section class="hero explorer-hero"><div class="hero-grid"></div><div class="hero-orbit orbit-a"></div><div class="hero-orbit orbit-b"></div>
+<section class="hero explorer-hero"><div class="hero-bg-slideshow"></div><div class="hero-bg-overlay"></div><div class="hero-grid"></div><div class="hero-orbit orbit-a"></div><div class="hero-orbit orbit-b"></div>
 <div class="wrap hero-content"><div class="eyebrow"><i></i>FAITH · IDENTITY · CHRIST</div>
-<h1 class="hero-title reveal">Explore a life of <em>new creation.</em></h1>
-<p class="reveal">Enter a growing world of music, books, videos and ideas. Find something that speaks to where you are today.</p>
+<h1 class="hero-title reveal"><span id="heroHeadingPrefix">Explore the life of the</span> <em id="heroHeadingHighlight">new creation.</em></h1>
+<p class="reveal" id="heroSubtext">Enter a growing world of music, books, videos and ideas. Find something that speaks to where you are today.</p>
 <div class="hero-actions reveal"><a class="btn btn-gold" href="#explore">Start exploring <span>↓</span></a><a class="btn btn-ghost" href="videos.html">Watch something</a></div>
 <div class="hero-proof reveal"><b>ONE PLATFORM</b><span>•</span> MUSIC <span>•</span> BOOKS <span>•</span> VIDEO <span>•</span> TEACHINGS</div></div>
 <div class="hero-mark"><div class="hero-mark-ring">✦</div></div></section>
@@ -27,14 +27,19 @@
 
 <section class="section discovery-panel"><div class="wrap"><div class="discovery-card reveal"><div><div class="section-tag">A thought for today</div><h2 id="verseText">If anyone is in Christ, he is a new creation.</h2><p id="verseRef">2 CORINTHIANS 5:17</p></div><button id="newThought" class="btn btn-ghost">Another thought ↻</button></div></div></section>
 
+<section class="section testimonials-section"><div class="wrap"><div class="section-head reveal"><div><div class="section-tag">What people are saying</div><h2>Voices from the <em>community.</em></h2></div><button class="btn btn-ghost" onclick="openReviewModal('site',null,'Cyberbishop')">Leave a review</button></div><div id="testimonialGrid" class="testimonial-grid reveal"><div class="empty">Loading reviews…</div></div></div></section>
+
+<section class="section"><div class="wrap"><div class="subscribe-panel reveal"><div class="section-tag">Stay in the loop</div><h2>Subscribe to get notifications of updates.</h2><p>New books, songs, videos and teachings — straight to your inbox as soon as they're published. No spam, unsubscribe anytime.</p><form id="subscribeForm" class="subscribe-form"><input id="subscribeEmail" type="email" required placeholder="you@example.com"><button class="btn btn-gold" type="submit">Subscribe</button></form><div class="subscribe-status" id="subscribeStatus"></div></div></div></section>
+
 <section class="section stats-section"><div class="wrap"><div class="section-head reveal"><div><div class="section-tag">The library</div><h2>Growing with <em>you.</em></h2></div><p>New stories, songs and messages are added regularly — check back often.</p></div><div class="stats large-stats reveal" id="stats"></div></div></section>
 
 <section class="quote"><div class="wrap reveal"><blockquote>“Therefore if anyone is in Christ, he is a new creation.”</blockquote><cite>2 CORINTHIANS 5:17</cite><a class="btn btn-gold" href="catalog.html">Continue exploring →</a></div></section>
-</main><div class="video-modal"><div class="video-box"><button class="close">Close</button><video controls playsinline></video></div></div><div data-site-footer></div>
+</main><div class="video-modal"><div class="video-box"><button class="close">Close</button><video controls playsinline></video></div></div><div class="review-modal"><div class="review-box"><button class="close">Close</button><h3 class="review-modal-title"></h3><div class="review-list"></div><div class="review-form-host"></div></div></div><div data-site-footer></div>
 <script>
 (async()=>{common();motion();
 const thoughts=[['If anyone is in Christ, he is a new creation.','2 CORINTHIANS 5:17'],['You are the light of the world.','MATTHEW 5:14'],['We walk by faith, not by sight.','2 CORINTHIANS 5:7'],['The truth will set you free.','JOHN 8:32'],['Be transformed by the renewing of your mind.','ROMANS 12:2']];
 let ti=0;document.getElementById('newThought').onclick=()=>{ti=(ti+1)%thoughts.length;document.getElementById('verseText').textContent=thoughts[ti][0];document.getElementById('verseRef').textContent=thoughts[ti][1]};
-try{const d=await loadData();const counts=[[d.categories.length,'Categories'],[d.books.length,'Books'],[d.songs.length,'Songs'],[d.videos.length,'Videos']];document.getElementById('stats').innerHTML=counts.map(x=>`<div class="stat"><strong>${x[0]}</strong><span>${x[1]}</span></div>`).join('');
-let items=[...d.videos.map(x=>[x,'video']),...d.songs.map(x=>[x,'song']),...d.books.map(x=>[x,'book'])].sort((a,b)=>(b[0].featured?1:0)-(a[0].featured?1:0)).slice(0,6);document.getElementById('featuredGrid').innerHTML=items.length?items.map(([x,t])=>mediaCard(x,t)).join(''):`<div class="empty">Your featured library will appear here as content is published.</div>`;bindVideos();bindSaves();bindReviews();motion()}catch(e){console.error(e);document.getElementById('featuredGrid').innerHTML='<div class="empty">Explore the pages above while the library loads.</div>'}})()
+wireSubscribeForm();renderHomepageReviews();
+try{const d=await loadData();applyHeroContent(d.settings);initHeroSlideshow(d.settings);const counts=[[d.categories.length,'Categories'],[d.books.length,'Books'],[d.songs.length,'Songs'],[d.videos.length,'Videos']];document.getElementById('stats').innerHTML=counts.map(x=>`<div class="stat"><strong>${x[0]}</strong><span>${x[1]}</span></div>`).join('');
+let items=[...d.videos.map(x=>[x,'video']),...d.songs.map(x=>[x,'song']),...d.books.map(x=>[x,'book'])].sort((a,b)=>(b[0].featured?1:0)-(a[0].featured?1:0)).slice(0,6);document.getElementById('featuredGrid').innerHTML=items.length?items.map(([x,t])=>mediaCard(x,t)).join(''):`<div class="empty">Your featured library will appear here as content is published.</div>`;bindVideos();bindSaves();bindReviews();motion()}catch(e){console.error(e);document.getElementById('featuredGrid').innerHTML='<div class="empty">Explore the pages above while the library loads.</div>';initHeroSlideshow(null)}})()
 </script></body></html>
