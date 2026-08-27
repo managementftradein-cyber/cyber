@@ -39,6 +39,77 @@ The CMS uses Supabase's browser upload API. This is suitable for normal-sized up
 
 The browser contains only the Supabase publishable key. The service-role key must never be placed in this project. Database and Storage RLS policies are the actual security boundary.
 
+## Newsletter / Subscriber Broadcasts (Resend)
+
+Cyberbishop can send daily prayers, devotionals, teachings and updates to
+subscribers via [Resend](https://resend.com). All secrets stay server-side —
+the browser never sees your Resend API key or Supabase service-role key.
+
+### 1. Run the database migrations
+
+In the Supabase SQL Editor, run (in this order, if not already run):
+
+1. `hero_and_subscribers_schema.sql` — creates the `subscribers` table.
+2. `subscribers_secure_migration.sql` — adds `status`/`unsubscribed_at` and
+   locks down write access so only the server-side API can insert/update rows.
+
+### 2. Set up Resend
+
+1. Create a Resend account at resend.com.
+2. Go to **Domains → Add Domain** and add `cyberbishop.org`.
+3. Resend will generate DNS records for you (typically an SPF/"send" TXT
+   record, a DKIM TXT or CNAME record, and a recommended DMARC TXT record —
+   the exact values are generated per-domain, so copy them from your Resend
+   dashboard). Add each one in your domain registrar's DNS settings.
+4. Wait for Resend to show the domain as **Verified** (can take a few
+   minutes to a few hours depending on DNS propagation).
+5. Go to **API Keys → Create API Key** and copy it.
+
+### 3. Add environment variables in Vercel
+
+Go to your Vercel project → **Settings → Environment Variables** and add:
+
+| Name | Value |
+|---|---|
+| `SUPABASE_SERVICE_ROLE_KEY` | From Supabase → Settings → API → `service_role` key. **Never** put this in any committed file. |
+| `RESEND_API_KEY` | From Resend → API Keys. |
+| `UNSUBSCRIBE_SECRET` | Any long random string (e.g. generate one with `openssl rand -hex 32`). Used to sign unsubscribe links. |
+| `RESEND_FROM` *(optional)* | Defaults to `Cyberbishop <hello@cyberbishop.org>`. |
+
+Redeploy after adding these (Vercel picks up new env vars on the next deploy).
+
+### 4. Test the subscribe form
+
+Submit an email on the homepage's "Stay in the loop" section. Check
+**Admin → Subscribers** to confirm it appears with status "Active".
+
+### 5. Send a test prayer email
+
+Go to **Admin → Broadcast**, write a subject/title/content, click **Preview**
+to check it looks right, then **Send test email** — it goes to your own
+admin login email (or whatever you type into "Send test to"). No real
+subscribers are contacted by this button.
+
+### 6. Send to subscribers
+
+Once you're happy with a test, **Send to active subscribers** sends the
+broadcast to everyone with status "Active", using Resend's batch API. This
+requires confirmation and only works for the signed-in administrator.
+
+### 7. Test unsubscribe
+
+Click the "Unsubscribe" link at the bottom of a test email. It should show a
+confirmation page and flip that subscriber's status to "Unsubscribed" in
+**Admin → Subscribers**.
+
+### Notes
+
+- Daily/scheduled sending isn't wired up yet — every send is a manual admin
+  action. Vercel Cron (or a similar scheduler) can be added later to call
+  `/api/send-broadcast` automatically once you're ready.
+- `RESEND_FROM` won't actually deliver from `hello@cyberbishop.org` until
+  step 2 shows the domain as verified in Resend.
+
 ## AI Chat Widget
 
 Every public page now shows a floating chat bubble (bottom-right). It greets

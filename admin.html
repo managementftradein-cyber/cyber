@@ -36,6 +36,7 @@
     <button class="tab" data-tab="reviews">Reviews</button>
     <button class="tab" data-tab="chat">Chatbot</button>
     <button class="tab" data-tab="subscribers">Subscribers</button>
+    <button class="tab" data-tab="broadcast">Broadcast</button>
     <button class="tab" data-tab="visits">Visitors</button>
     <button class="tab" data-tab="settings">Site settings</button>
   </div>
@@ -99,6 +100,20 @@
 
   <section id="subscribers" class="tab-panel"><div class="panel"><div class="section-title"><h2>Subscribers</h2><div class="actions"><span id="subscriberSummary" class="muted"></span><button id="refreshSubscribers">Refresh</button><button id="exportSubscribers">Export CSV</button></div></div><div id="subscriberList" class="items"></div></div></section>
 
+  <section id="broadcast" class="tab-panel"><div class="grid">
+    <div class="panel"><div class="section-title"><h2>Compose</h2></div>
+      <form id="broadcastForm">
+        <div class="field"><label>Subject line (what shows in the inbox)</label><input id="broadcastSubject" required placeholder="Today's prayer — walking in new creation"></div>
+        <div class="field"><label>Title (heading inside the email)</label><input id="broadcastTitle" required placeholder="A Prayer for Today"></div>
+        <div class="field"><label>Content</label><textarea id="broadcastContent" required rows="10" placeholder="Write the prayer, devotional or update here. Leave a blank line between paragraphs."></textarea></div>
+        <div class="field"><label>Send test to</label><input id="broadcastTestEmail" type="email" placeholder="Defaults to your admin email"></div>
+        <div class="actions"><button type="button" id="previewBroadcast">Preview</button><button type="button" id="sendTestBroadcast" class="primary">Send test email</button><button type="button" id="sendLiveBroadcast" class="danger">Send to active subscribers</button></div>
+        <div class="hint" id="broadcastStatus"></div>
+      </form>
+    </div>
+    <div class="panel"><div class="section-title"><h2>Preview</h2></div><iframe id="broadcastPreview" style="width:100%;height:520px;border:1px solid var(--line);border-radius:12px;background:#fff"></iframe></div>
+  </div></section>
+
   <section id="visits" class="tab-panel"><div class="panel"><div class="section-title"><h2>Visitors</h2><div class="actions"><span id="visitSummary" class="muted"></span><button id="refreshVisits">Refresh</button><button id="clearVisits" class="danger">Clear log</button></div></div><div id="visitList" class="items"></div></div></section>
 
   <section id="settings" class="tab-panel"><div class="panel"><div class="section-title"><h2>Site settings</h2></div>
@@ -141,8 +156,8 @@ function renderAll(){
   $('visitList').innerHTML=visits.map(v=>`<div class="item"><div class="item-main"><div class="item-title">${esc(new Date(v.created_at).toLocaleString())}</div><div class="item-meta">${esc(v.page||'unknown page')}${v.referrer?' · from '+esc(v.referrer):' · direct/unknown referrer'}<br>${esc(v.user_agent||'')}</div></div></div>`).join('')||'<span class="muted">No visits logged yet.</span>';
   if(settings){$('settingsWhatsapp').value=settings.whatsapp_url||'';$('settingsTelegram').value=settings.telegram_url||'';$('settingsSpotify').value=settings.spotify_artist_url||'';$('settingsAboutHeading').value=settings.about_heading||'';$('settingsAboutDescription').value=settings.about_description||'';$('chatAiEnabled').checked=settings.ai_fallback_enabled!==false;$('heroHeadingInput').value=settings.hero_heading||'';$('heroHighlightInput').value=settings.hero_highlight||'';$('heroSubtextInput').value=settings.hero_subtext||''}
   renderHeroImagesPreview();
-  $('subscriberSummary').textContent=`${subscribers.length} subscriber${subscribers.length===1?'':'s'}`;
-  $('subscriberList').innerHTML=subscribers.map(s=>`<div class="item"><div class="item-main"><div class="item-title">${esc(s.email)}</div><div class="item-meta">Subscribed ${new Date(s.created_at).toLocaleString()}</div></div><div class="item-actions"><button class="danger" onclick="deleteSubscriber('${s.id}')">Delete</button></div></div>`).join('')||'<span class="muted">No subscribers yet.</span>';
+  $('subscriberSummary').textContent=`${subscribers.filter(s=>(s.status||'active')==='active').length} active · ${subscribers.length} total`;
+  $('subscriberList').innerHTML=subscribers.map(s=>`<div class="item"><div class="item-main"><div class="item-title">${esc(s.email)} <span class="status ${(s.status||'active')==='active'?'published':''}">${(s.status||'active')==='active'?'Active':'Unsubscribed'}</span></div><div class="item-meta">Subscribed ${new Date(s.created_at).toLocaleString()}</div></div><div class="item-actions"><button class="danger" onclick="deleteSubscriber('${s.id}')">Delete</button></div></div>`).join('')||'<span class="muted">No subscribers yet.</span>';
   $('chatResponseList').innerHTML=chatResponses.map(r=>`<div class="item"><div class="item-main"><div class="item-title">${esc(r.trigger_phrases)} <span class="status ${r.active?'published':''}">${r.active?'Active':'Inactive'}</span></div><div class="item-meta">Priority ${r.priority} · ${esc(r.response)}</div></div><div class="item-actions"><button onclick="editChatResponse('${r.id}')">Edit</button><button class="danger" onclick="deleteChatResponse('${r.id}')">Delete</button></div></div>`).join('')||'<span class="muted">No canned responses yet.</span>';
 }
 function clearForm(type){const form=$(type+'Form');form.reset();$(type+'Id').value=''; if(type==='book'){$('bookPublished').checked=true;$('bookLinkLabel').value='Get on Selar';$('bookCoverPreview').innerHTML=''} if(type==='song'){$('songPublished').checked=true;$('songLinkLabel').value='Listen on Spotify';$('songCoverPreview').innerHTML=''} if(type==='video'){$('videoPublished').checked=true;$('videoLinkLabel').value='Watch';if($('videoUploadStatus'))$('videoUploadStatus').textContent=''} if(type==='category'){$('categoryOrder').value=0} if(type==='chatResponse'){$('chatResponseActive').checked=true;$('chatResponsePriority').value=0}}
@@ -170,7 +185,21 @@ $('saveAiToggle').onclick=async()=>{try{const r=await db.from('site_settings').u
 $('heroImagesFile').onchange=async()=>{const files=[...$('heroImagesFile').files];if(!files.length)return;try{for(const f of files){const url=await uploadCover(f);heroImages.push(url)}renderHeroImagesPreview();$('heroImagesFile').value=''}catch(e){toast(e.message,true)}};
 $('heroForm').onsubmit=async e=>{e.preventDefault();try{const payload={id:true,hero_heading:$('heroHeadingInput').value.trim()||null,hero_highlight:$('heroHighlightInput').value.trim()||null,hero_subtext:$('heroSubtextInput').value.trim()||null,hero_images:heroImages};const r=await db.from('site_settings').upsert(payload,{onConflict:'id'});if(r.error)throw r.error;toast('Hero section saved.');await loadAll()}catch(e){toast(e.message,true)}};
 $('refreshSubscribers').onclick=loadAll;
-$('exportSubscribers').onclick=()=>{if(!subscribers.length){toast('No subscribers to export.',true);return}const csv='email,subscribed_at\n'+subscribers.map(s=>`${s.email},${s.created_at}`).join('\n');const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cyberbishop-subscribers.csv';a.click();URL.revokeObjectURL(a.href)};
+$('exportSubscribers').onclick=()=>{if(!subscribers.length){toast('No subscribers to export.',true);return}const csv='email,subscribed_at,status\n'+subscribers.map(s=>`${s.email},${s.created_at},${s.status||'active'}`).join('\n');const blob=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cyberbishop-subscribers.csv';a.click();URL.revokeObjectURL(a.href)};
+
+function escapeHtmlAdmin(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function broadcastPreviewHtml(){const title=$('broadcastTitle').value||'(title)';const content=$('broadcastContent').value||'';const paras=content.split(/\n{2,}/).map(b=>`<p style="margin:0 0 16px;color:#3a352c;font-size:15px;line-height:1.7">${escapeHtmlAdmin(b).replace(/\n/g,'<br>')}</p>`).join('');return `<div style="font-family:Arial,sans-serif;background:#0d0e10;padding:24px"><div style="max-width:520px;margin:auto;background:#fdfbf6;border-radius:14px;overflow:hidden"><div style="background:#111214;padding:20px;text-align:center;font-family:Georgia,serif;font-weight:bold;color:#d6a64d;letter-spacing:.08em">CYBER<span style="color:#a78bfa">BISHOP</span></div><div style="padding:28px"><h1 style="font-family:Georgia,serif;font-size:22px;color:#17140f;margin:0 0 16px">${escapeHtmlAdmin(title)}</h1>${paras}<div style="margin-top:20px"><span style="display:inline-block;background:#d6a64d;color:#171308;font-weight:bold;padding:10px 18px;border-radius:8px;font-size:13px">Visit Cyberbishop</span></div></div><div style="padding:16px 28px;border-top:1px solid #ece6d8;color:#9a9384;font-size:11px">You're receiving this because you subscribed to Cyberbishop updates. Unsubscribe</div></div></div>`}
+$('previewBroadcast').onclick=()=>{$('broadcastPreview').srcdoc=broadcastPreviewHtml()};
+async function sendBroadcast(mode){const subject=$('broadcastSubject').value.trim();const title=$('broadcastTitle').value.trim();const content=$('broadcastContent').value.trim();const testEmail=$('broadcastTestEmail').value.trim();if(!subject||!title||!content){$('broadcastStatus').textContent='Please fill in subject, title and content.';return}
+  if(mode==='broadcast'){const activeCount=subscribers.filter(s=>(s.status||'active')==='active').length;if(!confirm(`Send this to all ${activeCount} active subscriber(s)? This cannot be undone.`))return}
+  $('broadcastStatus').textContent=mode==='test'?'Sending test…':'Sending to subscribers…';
+  try{const {data:{session}}=await db.auth.getSession();if(!session)throw new Error('Please sign in again.');
+    const r=await fetch('/api/send-broadcast',{method:'POST',headers:{'content-type':'application/json',authorization:`Bearer ${session.access_token}`},body:JSON.stringify({mode,subject,title,content,testEmail})});
+    const data=await r.json();if(!r.ok||!data.ok)throw new Error(data.error||'Failed to send.');
+    $('broadcastStatus').textContent=mode==='test'?`Test email sent to ${data.testSentTo}.`:`Sent to ${data.sent} subscriber(s).`;
+  }catch(e){$('broadcastStatus').textContent=e.message}}
+$('sendTestBroadcast').onclick=()=>sendBroadcast('test');
+$('sendLiveBroadcast').onclick=()=>sendBroadcast('broadcast');
 ['category','book','song','video','chatResponse'].forEach(t=>$(t+'Cancel').onclick=()=>clearForm(t));['refreshCategories','refreshBooks','refreshSongs','refreshVideos','refreshChatResponses'].forEach(id=>$(id).onclick=loadAll);
 $('reviewFilterPending').onclick=()=>{reviewFilter='pending';$('reviewFilterPending').classList.add('primary');$('reviewFilterApproved').classList.remove('primary');renderAll()};
 $('reviewFilterApproved').onclick=()=>{reviewFilter='approved';$('reviewFilterApproved').classList.add('primary');$('reviewFilterPending').classList.remove('primary');renderAll()};
